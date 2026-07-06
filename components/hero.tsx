@@ -1,10 +1,11 @@
 import { NextLogo } from "./next-logo";
+import { ShadcnLogo } from "./shadcn-logo";
 import { SupabaseLogo } from "./supabase-logo";
 
 export function Hero() {
   return (
     <div className="flex flex-col gap-16 items-center">
-      <div className="flex gap-8 justify-center items-center">
+      <div className="flex flex-wrap gap-6 justify-center items-center">
         <a
           href="https://supabase.com/?utm_source=create-next-app&utm_medium=template&utm_term=nextjs"
           target="_blank"
@@ -16,9 +17,21 @@ export function Hero() {
         <a href="https://nextjs.org/" target="_blank" rel="noreferrer">
           <NextLogo />
         </a>
+        <span className="border-l rotate-45 h-6" />
+        <a
+          href="https://ui.shadcn.com/"
+          target="_blank"
+          className="flex items-center gap-2 text-lg font-semibold"
+          rel="noreferrer"
+        >
+          <ShadcnLogo className="size-5" aria-hidden="true" />
+          <span>shadcn/ui</span>
+        </a>
       </div>
-      <h1 className="sr-only">Supabase and Next.js Starter Template</h1>
-      <p className="text-3xl lg:text-4xl !leading-tight mx-auto max-w-xl text-center">
+      <h1 className="sr-only">
+        Supabase, Next.js, and shadcn Starter Template
+      </h1>
+      <p className="text-3xl lg:text-4xl !leading-tight mx-auto max-w-2xl text-center">
         The fastest way to build apps with{" "}
         <a
           href="https://supabase.com/?utm_source=create-next-app&utm_medium=template&utm_term=nextjs"
@@ -27,8 +40,8 @@ export function Hero() {
           rel="noreferrer"
         >
           Supabase
-        </a>{" "}
-        and{" "}
+        </a>
+        {", "}
         <a
           href="https://nextjs.org/"
           target="_blank"
@@ -36,6 +49,15 @@ export function Hero() {
           rel="noreferrer"
         >
           Next.js
+        </a>
+        {", and "}
+        <a
+          href="https://ui.shadcn.com/"
+          target="_blank"
+          className="font-bold hover:underline"
+          rel="noreferrer"
+        >
+          shadcn/ui
         </a>
       </p>
       <div className="w-full p-[1px] bg-gradient-to-r from-transparent via-foreground/10 to-transparent my-8" />
