@@ -139,6 +139,7 @@ function openFallbackTty() {
     return {
       input,
       output,
+      isFallback: true,
       close() {
         input.destroy();
         output.destroy();
@@ -154,6 +155,7 @@ function getPromptTerminal({ isPostinstall, stdin, stdout }) {
     return {
       input: stdin,
       output: stdout,
+      isFallback: false,
       close() {},
     };
   }
@@ -301,6 +303,12 @@ function clearMenu(output, lineCount) {
   }
 }
 
+function confirmChoice(output, choice) {
+  output.write(
+    `${colorize("green", "Selected:", { output })} ${choice.label}\n`,
+  );
+}
+
 export async function promptChoice({
   input = process.stdin,
   output = process.stdout,
@@ -337,7 +345,6 @@ export async function promptChoice({
     const cleanup = () => {
       input.off("keypress", onKeypress);
       input.setRawMode(wasRaw);
-      input.pause();
     };
 
     onKeypress = (_value, key) => {
@@ -357,9 +364,11 @@ export async function promptChoice({
       }
 
       if (key.name === "return") {
+        const choice = choices[selectedIndex];
         cleanup();
-        output.write("\n");
-        resolve(choices[selectedIndex]);
+        clearMenu(output, lineCount);
+        confirmChoice(output, choice);
+        resolve(choice);
         return;
       }
 
@@ -394,12 +403,12 @@ export function shouldCleanupSetup({ result }) {
   );
 }
 
-async function runCommand(command, args, { cwd }) {
+async function runCommand(command, args, { cwd, stdio = "inherit" }) {
   return await new Promise((resolve) => {
     const child = spawn(command, args, {
       cwd,
       shell: process.platform === "win32",
-      stdio: "inherit",
+      stdio,
     });
 
     child.on("close", (status) => resolve({ status }));
@@ -461,25 +470,33 @@ export async function runSetup({
 
   let choice;
 
-  try {
-    choice = await chooseSidebar({
-      input: promptTerminal?.input ?? stdin,
-      output: promptTerminal?.output ?? stdout,
-      choices: SIDEBAR_CHOICES,
-    });
-  } finally {
-    promptTerminal?.close();
-  }
+  choice = await chooseSidebar({
+    input: promptTerminal?.input ?? stdin,
+    output: promptTerminal?.output ?? stdout,
+    choices: SIDEBAR_CHOICES,
+  });
 
   if (!choice) {
+    promptTerminal?.close();
     stderr.write("Optional supanextcn UI setup cancelled.\n");
     return { status: "cancelled" };
   }
 
   if (choice.id === "none") {
+    promptTerminal?.close();
     await writeMarker(cwd, choice);
     stdout.write("No sidebar block installed.\n");
     return { status: "skipped", choice: choice.id };
+  }
+
+  const commandOptions = { cwd };
+
+  if (promptTerminal?.isFallback) {
+    commandOptions.stdio = [
+      promptTerminal.input,
+      promptTerminal.output,
+      promptTerminal.output,
+    ];
   }
 
   const result = await executeCommand("pnpm", [
@@ -488,7 +505,8 @@ export async function runSetup({
     "add",
     choice.id,
     "--yes",
-  ], { cwd });
+  ], commandOptions);
+  promptTerminal?.close();
 
   if (result.status !== 0) {
     stderr.write(`Failed to install ${choice.id}.\n`);

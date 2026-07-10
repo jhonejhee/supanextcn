@@ -113,7 +113,7 @@ test("skipped non-interactive postinstall should keep setup fallback", () => {
   );
 });
 
-test("selecting a prompt choice always pauses stdin", async () => {
+test("selecting a prompt choice restores raw mode without pausing stdin", async () => {
   const listeners = new Map();
   const input = {
     isRaw: false,
@@ -153,8 +153,80 @@ test("selecting a prompt choice always pauses stdin", async () => {
   const choice = await choicePromise;
 
   assert.equal(choice.id, "none");
-  assert.equal(input.pauseCount, 1);
+  assert.equal(input.pauseCount, 0);
   assert.equal(input.isRaw, false);
+});
+
+test("selecting a prompt choice clears choices and confirms selection", async () => {
+  const listeners = new Map();
+  const writes = [];
+  const input = {
+    isRaw: false,
+    isTTY: true,
+    resume() {},
+    pause() {},
+    setRawMode(value) {
+      this.isRaw = value;
+    },
+    on(event, listener) {
+      listeners.set(event, listener);
+    },
+    off(event) {
+      listeners.delete(event);
+    },
+    listenerCount(event) {
+      return listeners.has(event) ? 1 : 0;
+    },
+  };
+  const output = {
+    isTTY: true,
+    getColorDepth: () => 1,
+    write(value) {
+      writes.push(value);
+    },
+  };
+
+  const choicePromise = promptChoice({
+    input,
+    output,
+    choices: SIDEBAR_CHOICES,
+  });
+
+  listeners.get("keypress")("", { name: "return" });
+  const choice = await choicePromise;
+
+  assert.equal(choice.id, "none");
+  assert.match(writes.at(-1), /Selected: No Sidebar/);
+});
+
+test("selecting a sidebar allows shadcn to ask follow-up questions", async () => {
+  const cwd = await mkdtemp(path.join(tmpdir(), "supanextcn-setup-"));
+  const commands = [];
+
+  try {
+    await runSetup({
+      cwd,
+      env: {},
+      stdin: { isTTY: true },
+      stdout: { isTTY: true, write() {} },
+      stderr: { write() {} },
+      isPostinstall: false,
+      promptChoice: async () =>
+        SIDEBAR_CHOICES.find((choice) => choice.id === "sidebar-01"),
+      runCommand: async (...command) => {
+        commands.push(command);
+        return { status: 0 };
+      },
+    });
+
+    assert.deepEqual(commands[0], [
+      "pnpm",
+      ["dlx", "shadcn@latest", "add", "sidebar-01", "--yes"],
+      { cwd },
+    ]);
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
 });
 
 test("selecting No Sidebar writes a marker and does not run shadcn", async () => {
