@@ -15,6 +15,26 @@ pnpm dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+During install, the starter asks whether you want to add a shadcn sidebar
+block. Choose `No Sidebar` to keep the starter unchanged, or pick one of the
+sidebar blocks to install it at `/dashboard`.
+
+If your install runs without interactive prompts and prints a setup skipped
+message, you can run the setup later:
+
+```bash
+pnpm setup:ui
+```
+
+After setup completes, either during install or from `pnpm setup:ui`, the
+one-time setup helper removes itself from the generated project.
+
+To choose again before setup has cleaned itself up, run:
+
+```bash
+pnpm setup:ui --force
+```
+
 ## Stack
 
 - Next.js
@@ -51,6 +71,7 @@ pnpm dev
 pnpm build
 pnpm start
 pnpm lint
+pnpm test
 ```
 
 ## Credits
