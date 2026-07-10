@@ -2,6 +2,8 @@
 
 A modern Next.js starter with Supabase, shadcn/ui, Tailwind CSS, TypeScript, and pnpm.
 
+<img width="100%" alt="Image" src="https://github.com/user-attachments/assets/815b9194-4241-4f03-985f-808a153fc495?raw=true" />
+
 ## Use This Template
 
 Create a new app from this starter:
