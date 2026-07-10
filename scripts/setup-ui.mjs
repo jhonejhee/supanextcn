@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { constants as fsConstants } from "node:fs";
+import { constants as fsConstants, openSync } from "node:fs";
 import {
   access,
   readFile,
@@ -10,6 +10,7 @@ import {
 } from "node:fs/promises";
 import path from "node:path";
 import readline from "node:readline";
+import { ReadStream, WriteStream } from "node:tty";
 import { fileURLToPath } from "node:url";
 
 export const MARKER_FILE = ".supanextcn-setup.json";
@@ -104,7 +105,13 @@ export const SIDEBAR_CHOICES = [
   },
 ];
 
-export function getPostinstallSkipReason({ isPostinstall, env, stdin, stdout }) {
+export function getPostinstallSkipReason({
+  isPostinstall,
+  env,
+  stdin,
+  stdout,
+  hasFallbackTty = false,
+}) {
   if (!isPostinstall) {
     return null;
   }
@@ -113,11 +120,49 @@ export function getPostinstallSkipReason({ isPostinstall, env, stdin, stdout }) 
     return "non-interactive environment";
   }
 
-  if (!stdin.isTTY || !stdout.isTTY) {
+  if ((!stdin.isTTY || !stdout.isTTY) && !hasFallbackTty) {
     return "non-interactive terminal";
   }
 
   return null;
+}
+
+function openFallbackTty() {
+  if (process.platform === "win32") {
+    return null;
+  }
+
+  try {
+    const input = new ReadStream(openSync("/dev/tty", "r"));
+    const output = new WriteStream(openSync("/dev/tty", "w"));
+
+    return {
+      input,
+      output,
+      close() {
+        input.destroy();
+        output.destroy();
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
+function getPromptTerminal({ isPostinstall, stdin, stdout }) {
+  if (stdin.isTTY && stdout.isTTY) {
+    return {
+      input: stdin,
+      output: stdout,
+      close() {},
+    };
+  }
+
+  if (!isPostinstall) {
+    return null;
+  }
+
+  return openFallbackTty();
 }
 
 async function fileExists(filePath) {
@@ -379,11 +424,32 @@ export async function runSetup({
     return { status: "already-completed" };
   }
 
+  if (isPostinstall && (env.CI || env.CONTINUOUS_INTEGRATION)) {
+    const skipReason = getPostinstallSkipReason({
+      isPostinstall,
+      env,
+      stdin,
+      stdout,
+    });
+
+    stdout.write(
+      `Skipping optional supanextcn UI setup: ${skipReason}. Run pnpm setup:ui later.\n`,
+    );
+    return { status: "skipped", reason: skipReason };
+  }
+
+  const promptTerminal = getPromptTerminal({
+    isPostinstall,
+    stdin,
+    stdout,
+  });
+
   const skipReason = getPostinstallSkipReason({
     isPostinstall,
     env,
     stdin,
     stdout,
+    hasFallbackTty: Boolean(promptTerminal),
   });
 
   if (skipReason) {
@@ -393,11 +459,17 @@ export async function runSetup({
     return { status: "skipped", reason: skipReason };
   }
 
-  const choice = await chooseSidebar({
-    input: stdin,
-    output: stdout,
-    choices: SIDEBAR_CHOICES,
-  });
+  let choice;
+
+  try {
+    choice = await chooseSidebar({
+      input: promptTerminal?.input ?? stdin,
+      output: promptTerminal?.output ?? stdout,
+      choices: SIDEBAR_CHOICES,
+    });
+  } finally {
+    promptTerminal?.close();
+  }
 
   if (!choice) {
     stderr.write("Optional supanextcn UI setup cancelled.\n");

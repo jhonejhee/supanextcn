@@ -35,6 +35,18 @@ test("postinstall skips in non-interactive environments", () => {
   assert.equal(reason, "non-interactive environment");
 });
 
+test("postinstall can use a fallback tty when pnpm captures lifecycle stdio", () => {
+  const reason = getPostinstallSkipReason({
+    isPostinstall: true,
+    env: {},
+    stdin: { isTTY: false },
+    stdout: { isTTY: false },
+    hasFallbackTty: true,
+  });
+
+  assert.equal(reason, null);
+});
+
 test("selected choices are colored when colors are supported", () => {
   const output = {
     isTTY: true,
